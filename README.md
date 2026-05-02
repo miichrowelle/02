@@ -4,23 +4,31 @@ A web application that helps you manage fermentation projects with time planning
 
 ## Features
 
-- **Fermentation Time Planning**: Select what you're fermenting and your location's temperature to get a personalized time plan
-- **9 Fermentation Types**: Milk Kefir, Yogurt, Buttermilk, Water Kefir, Kombucha, Sauerkraut, Kimchi, Pickled Vegetables, Sourdough Starter
+- **Temperature-Based Planning**: Select what you're fermenting and your room temperature to get a personalized timeline
+- **9 Fermentation Types** across 4 categories:
+  - **Dairy**: Milk Kefir, Buttermilk
+  - **Beverages**: Water Kefir, Kombucha
+  - **Vegetables**: Sauerkraut, Kimchi, Pickled Vegetables
+  - **Grains**: Sourdough Starter, Sourdough Bulk
 - **Dynamic Calendar Subscription**: Get a unique URL for each fermentation that generates a dynamic `.ics` file
-- **Apple Design System**: Clean, native iOS-like interface with proper system fonts and styling
-- **European Time Format**: 24-hour format with relative time displays ("in 3 days", "in 12h")
+- **Apple Design System**: Clean, native iOS-like interface
+- **European Time Format**: 24-hour format with relative time displays
 
 ## Tech Stack
 
 ### Frontend
 - **React 18** with Vite
-- **Apple Design System** styling (SF Pro fonts, iOS-like components)
-- Native HTML `<select>` elements for iOS picker behavior
+- **Apple Design System** styling
 
 ### Backend
 - **Node.js** with Express
 - **SQLite** (better-sqlite3) for data persistence
 - **ical-generator** for dynamic `.ics` calendar feeds
+
+### Deployment
+- **Docker** multi-stage build
+- **Single container** — Express serves the built React frontend
+- Designed for **Unraid** + **Tailscale** remote access
 
 ## Project Structure
 
@@ -29,77 +37,99 @@ fermentation-planner/
 ├── client/                    # React + Vite frontend
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── FermentForm.jsx    # Type/category selection + temperature slider
-│   │   │   ├── TimePlan.jsx        # Timeline display with relative times
-│   │   │   └── CalendarInfo.jsx   # Calendar subscription UI
-│   │   ├── App.jsx                # Main app component
-│   │   ├── main.jsx               # Entry point
-│   │   └── styles.css             # All styling (Apple Design System)
-│   ├── index.html
-│   ├── vite.config.js
+│   │   ├── App.jsx
+│   │   └── main.jsx
 │   └── package.json
 │
-└── server/                    # Express backend
-    ├── data/
-    │   └── rules.js             # Fermentation rulebook (type + temp → duration)
-    ├── routes/
-    │   ├── fermentation.js      # API routes for creating/getting fermentations
-    │   └── ics.js              # Dynamic .ics calendar feed generator
-    ├── db.js                   # SQLite database setup
-    ├── index.js                # Server entry point
-    └── package.json
+├── server/                    # Express backend
+│   ├── data/
+│   │   └── rules.js             # Fermentation math (temp → duration)
+│   ├── routes/
+│   │   ├── fermentation.js
+│   │   └── ics.js
+│   ├── db.js
+│   └── index.js
+│
+├── Dockerfile                 # Multi-stage Docker build
+├── docker-compose.yml         # Single-service deployment
+└── .dockerignore
 ```
 
 ## Getting Started
 
 ### Prerequisites
-- Node.js v20+ (v20.11.1 tested)
-- npm (comes with Node.js)
+- Node.js v20+
+- npm
 
-### Installation
+### Local Development
 
 ```bash
-# Install backend dependencies
+# Install dependencies
 cd server && npm install
-
-# Install frontend dependencies
 cd ../client && npm install
-```
 
-### Running Locally (for development)
-
-**Terminal 1 - Backend:**
-```bash
+# Terminal 1 - Backend
 cd server
-PUBLIC_URL=http://YOUR_LOCAL_IP:3000 node index.js
-```
+node index.js
 
-**Terminal 2 - Frontend:**
-```bash
+# Terminal 2 - Frontend
 cd client
 npm run dev
 ```
 
-The app will be available at:
-- Frontend: `http://localhost:5173` or `http://YOUR_LOCAL_IP:5173` (for phone access)
+App available at:
+- Frontend: `http://localhost:5173`
 - Backend API: `http://localhost:3000`
 
-### Testing on Your Phone (Same WiFi)
+## Docker Deployment (Unraid)
 
-1. Find your computer's local IP: `ifconfig | grep "inet "` (look for non-127.0.0.1)
-2. Start backend with: `PUBLIC_URL=http://YOUR_IP:3000 node index.js`
-3. Start frontend: `cd client && npm run dev` (uses `--host` flag automatically)
-4. On your phone, open: `http://YOUR_IP:5173`
-5. The calendar subscription URL will use your IP, making it accessible from your phone
+### Build & Run
+
+```bash
+docker compose up -d --build
+```
+
+### Unraid Setup
+
+1. Copy project to `/mnt/user/appdata/fermentation-planner/`
+2. SSH into Unraid and run `docker compose up -d --build`
+3. Access via Tailscale: `http://<unraid-tailscale-ip>:3000`
+
+### Container Configuration
+
+| Setting | Value |
+|---------|-------|
+| Port | `3000` |
+| Volume | `/mnt/user/appdata/fermentation-planner/data:/app/data` |
+| Env: `DB_PATH` | `/app/data/fermentation.db` |
+| Env: `NODE_ENV` | `production` |
 
 ## API Endpoints
 
 | Method | Route | Purpose |
 |--------|-------|---------|
-| POST | `/api/fermentation` | Create new fermentation session |
-| GET | `/api/fermentation/:id` | Get fermentation details + plan |
-| GET | `/api/fermentation/:id/ics` | Dynamic .ics file for calendar subscription |
-| PUT | `/api/fermentation/:id` | Update fermentation (temperature change) |
+| POST | `/api/fermentation` | Create new fermentation |
+| GET | `/api/fermentation/:id` | Get fermentation details |
+| PUT | `/api/fermentation/:id` | Update temperature |
+| GET | `/api/fermentation/:id/ics` | Dynamic `.ics` calendar feed |
+
+## Fermentation Math
+
+Durations are calculated from temperature using linear formulas in `server/data/rules.js`. Each type has its own temperature ranges and return values (all in hours):
+
+| Type | Range | Formula |
+|------|-------|---------|
+| Milk Kefir | 8–30°C | `-2T + 64` / `-T + 44` |
+| Buttermilk | <27°C | `-1.2T + 60` / `-1.2T + 54` |
+| Water Kefir | <28°C | `48h` / `-1.2T + 72` / `-2T + 80` |
+| Kombucha | 18–30°C | Day-based × 24 |
+| Sauerkraut | 15–28°C | Day-based × 24 |
+| Kimchi | 15–30°C | Day-based × 24 |
+| Pickled Veg | 15°C+ | Day-based × 24 |
+| Sourdough Starter | 18–28°C | Hours |
+| Sourdough Bulk | <30°C | Hours |
+
+Out-of-range temperatures clamp to the nearest valid value.
 
 ## Calendar Subscription
 
@@ -107,17 +137,6 @@ Each fermentation generates a unique calendar URL. Subscribe in:
 - **Google Calendar**: + → From URL → Paste ICS URL
 - **Apple Calendar**: File → New Calendar Subscription → Paste URL
 
-The calendar updates automatically when you make changes (dynamic ICS generation).
-
-## Fermentation Rulebook
-
-The `server/data/rules.js` file contains all fermentation rules:
-- **Temperature ranges** with corresponding durations
-- **Step-by-step instructions** with timing
-- **Check intervals** for routine monitoring
-
-To add new fermentation types, add entries following the existing structure.
-
 ## License
 
-MIT License - feel free to use this for your fermentation projects!
+MIT
