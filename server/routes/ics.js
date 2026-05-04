@@ -1,16 +1,21 @@
 const express = require('express');
 const icalPkg = require('ical-generator');
 const ICalCalendar = icalPkg.default || icalPkg;
-const { getFermentation } = require('../firebase-db');
+const { getFermentation } = require('../db');
 
 const router = express.Router();
 
-router.get('/:id/ics', async (req, res) => {
-  const fermentation = await getFermentation(req.params.id);
+router.get('/:id/ics', (req, res) => {
+  const fermentation = getFermentation(req.params.id);
 
   if (!fermentation) {
     return res.status(404).send('Fermentation not found');
   }
+
+  // Use forwarded headers if behind proxy (Vite)
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.get('host');
+  const baseUrl = `${protocol}://${host}`;
 
   const cal = new ICalCalendar({
     name: `Fermentation: ${fermentation.plan.type}`,

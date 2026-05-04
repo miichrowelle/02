@@ -64,14 +64,11 @@ const rules = {
     maxTemp: 28,
     steps: [
       { step: "Abfüllen", offsetHours: 0, description: "Dissolve sugar in water, add kefir grains and optional dried fruit" },
-      { step: "1. Fermentation", offsetHours: null, description: "First fermentation in progress" },
+      { step: "Fermentation", offsetHours: null, description: "First fermentation in progress" },
       { step: "Check", offsetHours: 12, description: "Check for bubbles and slight fizz" },
-      { step: "optional 2. Fermentation", offsetHours: null, description: "Add fruit/juice if desired, let ferment at room temp" },
-      { step: "Check", offsetHours: 36, description: "Check fizz level" },
       { step: "Fertig", offsetHours: null, description: "Refrigerate and enjoy! Consume within 1 week" },
     ],
     checkIntervalHours: 12,
-    f2OffsetHours: 12,
   },
 
   "kombucha": {
@@ -91,14 +88,11 @@ const rules = {
     maxTemp: 30,
     steps: [
       { step: "Abfüllen", offsetHours: 0, description: "Brew tea, add sugar, let cool to room temperature" },
-      { step: "1. Fermentation", offsetHours: null, description: "First fermentation with SCOBY" },
+      { step: "Fermentation", offsetHours: null, description: "First fermentation with SCOBY" },
       { step: "Check", offsetHours: 72, description: "Taste test - should be mildly tart, not too sweet" },
-      { step: "optional 2. Fermentation", offsetHours: 24, description: "Bottle with juice/fruit for second fermentation" },
-      { step: "Check", offsetHours: 48, description: "Check fizz level" },
       { step: "Fertig", offsetHours: null, description: "Refrigerate and enjoy! Burp bottles daily if needed" },
     ],
     checkIntervalHours: 48,
-    f2OffsetHours: 24,
   },
 
   "kimchi": {
@@ -120,10 +114,8 @@ const rules = {
     maxTemp: 30,
     steps: [
       { step: "Abfüllen", offsetHours: 0, description: "Salt Napa cabbage and radish, let sit 2 hours to draw out water" },
-      { step: "Initialfermentation bei Raumtemperatur", offsetHours: 24, description: "Leave at room temp 2-4 days, burp jar daily" },
+      { step: "Fermentation", offsetHours: null, description: "Fermentation in progress" },
       { step: "Check", offsetHours: 48, description: "Check fermentation progress" },
-      { step: "Fermentation im Kühlschrank", offsetHours: null, description: "Transfer to fridge for slow fermentation" },
-      { step: "Check", offsetHours: 168, description: "Weekly check in fridge" },
       { step: "Fertig", offsetHours: null, description: "Transfer to fridge. Flavor improves for 1-2 weeks" },
     ],
     checkIntervalHours: 24,
@@ -234,24 +226,20 @@ const rules = {
   },
 };
 
-// Helper: get duration based on temperature using rule's function or tempRanges
+// Helper: get duration based on temperature using rule's function
 function getDurationForTemp(rule, temperature) {
-  // New method: use getDurationHours function
   if (rule.getDurationHours) {
     const duration = rule.getDurationHours(temperature);
     if (duration !== null) return duration;
-    // Fallback: clamp to valid temp range and recalculate
     const clampedTemp = Math.max(rule.minTemp || -Infinity, Math.min(temperature, rule.maxTemp || Infinity));
     return rule.getDurationHours(clampedTemp);
   }
-  // Legacy method: use tempRanges (for rules like yogurt without getDurationHours)
   if (rule.tempRanges) {
     for (const range of rule.tempRanges) {
       if (temperature >= range.min && temperature <= range.max) {
         return range.durationHours;
       }
     }
-    // Fallback: find closest range
     const diffs = rule.tempRanges.map((r) => ({
       range: r,
       diff: Math.min(Math.abs(temperature - r.min), Math.abs(temperature - r.max)),
@@ -273,36 +261,13 @@ function generatePlan(typeKey, temperature, startTime = new Date()) {
   const steps = [];
   let hasSecondFermentation = false;
 
-  // First pass: check if there's a second fermentation step
-  rule.steps.forEach((s) => {
-    if (s.step === "optional 2. Fermentation" || s.step === "Fermentation im Kühlschrank") {
-      hasSecondFermentation = true;
-    }
-  });
-
   rule.steps.forEach((s, i) => {
     let offset = s.offsetHours;
     if (offset === null) {
-      // Dynamic step - set based on context
-      if (s.step === "Fermentation" || s.step === "1. Fermentation") {
-        // Main fermentation ends at durationHours
-        offset = durationHours;
-      } else if (s.step === "Initialfermentation bei Raumtemperatur") {
-        // Kimchi: first room temp fermentation, then fridge
-        offset = durationHours / 2; // Split time between room temp and fridge
-      } else if (s.step === "Fermentation im Kühlschrank") {
-        // Kimchi: second fermentation in fridge
-        offset = durationHours;
-      } else if (s.step === "optional 2. Fermentation") {
-        // Second fermentation starts after main fermentation
+      if (s.step === "Fermentation") {
         offset = durationHours;
       } else if (s.step === "Fertig") {
-        // End of entire process
-        if (hasSecondFermentation) {
-          offset = durationHours + (rule.f2OffsetHours || 24);
-        } else {
-          offset = durationHours;
-        }
+        offset = durationHours;
       }
     }
 
@@ -317,7 +282,6 @@ function generatePlan(typeKey, temperature, startTime = new Date()) {
     }
   });
 
-  // Add check events (only up to main fermentation end, not including second fermentation)
   const checks = [];
   const checkInterval = rule.checkIntervalHours || 48;
   let checkTime = startTime.getTime() + checkInterval * 60 * 60 * 1000;

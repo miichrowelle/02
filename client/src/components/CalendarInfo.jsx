@@ -5,11 +5,30 @@ function CalendarInfo({ plan }) {
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(plan.icsUrl)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(plan.icsUrl)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      } else {
+        // Fallback for iOS Safari
+        const textArea = document.createElement('textarea')
+        textArea.value = plan.icsUrl
+        textArea.style.position = 'fixed'
+        textArea.style.opacity = '0'
+        document.body.appendChild(textArea)
+        textArea.focus()
+        textArea.select()
+        try {
+          document.execCommand('copy')
+          setCopied(true)
+          setTimeout(() => setCopied(false), 2000)
+        } catch (err) {
+          alert('Please copy the URL manually: ' + plan.icsUrl)
+        }
+        document.body.removeChild(textArea)
+      }
     } catch (err) {
-      alert('Failed to copy. Please copy the URL manually.')
+      alert('Please copy the URL manually: ' + plan.icsUrl)
     }
   }
 

@@ -6,7 +6,6 @@ const CATEGORIES = [
     label: 'Dairy',
     types: [
       { value: 'milk-kefir', label: 'Milk Kefir' },
-      { value: 'yogurt', label: 'Yogurt' },
       { value: 'buttermilk', label: 'Buttermilk' },
     ],
   },
@@ -32,6 +31,7 @@ const CATEGORIES = [
     label: 'Grains',
     types: [
       { value: 'sourdough-starter', label: 'Sourdough Starter' },
+      { value: 'sourdough-bulk', label: 'Sourdough Bulk' },
     ],
   },
 ]

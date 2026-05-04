@@ -12,6 +12,7 @@ function App() {
     setLoading(true)
     setError(null)
     try {
+      // Use relative URL - Vite proxy will forward to backend
       const res = await fetch('/api/fermentation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

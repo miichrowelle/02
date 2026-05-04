@@ -6,9 +6,19 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
+        configure: (proxy, options) => {
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            // Forward the original host and protocol to the backend
+            proxyReq.setHeader('x-forwarded-host', req.headers['host']);
+            proxyReq.setHeader('x-forwarded-proto', req.socket.encrypted ? 'https' : 'http');
+          });
+        },
       },
+    },
+    hmr: {
+      clientPort: 5173,
     },
   },
 })
