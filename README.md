@@ -22,13 +22,13 @@ A web application that helps you manage fermentation projects with time planning
 
 ### Backend
 - **Node.js** with Express
-- **SQLite** (better-sqlite3) for data persistence
+- **Firebase Firestore** for data persistence
+- **Firebase Functions** for API hosting
 - **ical-generator** for dynamic `.ics` calendar feeds
 
 ### Deployment
-- **Docker** multi-stage build
-- **Single container** — Express serves the built React frontend
-- Designed for **Unraid** + **Tailscale** remote access
+- **Firebase App Hosting** (full-stack: frontend + backend)
+- **Firebase Functions** (Node.js 20 runtime)
 
 ## Project Structure
 
@@ -41,18 +41,18 @@ fermentation-planner/
 │   │   └── main.jsx
 │   └── package.json
 │
-├── server/                    # Express backend
+├── server/                    # Firebase Functions backend
 │   ├── data/
 │   │   └── rules.js             # Fermentation math (temp → duration)
 │   ├── routes/
 │   │   ├── fermentation.js
 │   │   └── ics.js
-│   ├── db.js
-│   └── index.js
+│   ├── firebase-db.js          # Firestore database functions
+│   ├── index.js                # Firebase Functions entry point
+│   └── package.json
 │
-├── Dockerfile                 # Multi-stage Docker build
-├── docker-compose.yml         # Single-service deployment
-└── .dockerignore
+├── firebase.json              # Firebase configuration
+└── README.md
 ```
 
 ## Getting Started
@@ -60,6 +60,8 @@ fermentation-planner/
 ### Prerequisites
 - Node.js v20+
 - npm
+- Firebase CLI (`npm install -g firebase-tools`)
+- Firebase project (create at [console.firebase.google.com](https://console.firebase.google.com))
 
 ### Local Development
 
@@ -68,9 +70,9 @@ fermentation-planner/
 cd server && npm install
 cd ../client && npm install
 
-# Terminal 1 - Backend
+# Terminal 1 - Backend (Firebase emulators)
 cd server
-node index.js
+firebase emulators:start
 
 # Terminal 2 - Frontend
 cd client
@@ -79,30 +81,37 @@ npm run dev
 
 App available at:
 - Frontend: `http://localhost:5173`
-- Backend API: `http://localhost:3000`
+- Backend API: `http://localhost:5001/<your-project>/us-central1/api`
 
-## Docker Deployment (Unraid)
+## Firebase Deployment
 
-### Build & Run
+### Setup
 
 ```bash
-docker compose up -d --build
+# Login to Firebase
+firebase login
+
+# Initialize Firebase (if not done)
+firebase init hosting,functions
+
+# Build the React frontend
+cd client && npm run build
 ```
 
-### Unraid Setup
+### Deploy
 
-1. Copy project to `/mnt/user/appdata/fermentation-planner/`
-2. SSH into Unraid and run `docker compose up -d --build`
-3. Access via Tailscale: `http://<unraid-tailscale-ip>:3000`
+```bash
+# Deploy everything (functions + hosting)
+firebase deploy
 
-### Container Configuration
+# Or deploy separately
+firebase deploy --only functions
+firebase deploy --only hosting
+```
 
-| Setting | Value |
-|---------|-------|
-| Port | `3000` |
-| Volume | `/mnt/user/appdata/fermentation-planner/data:/app/data` |
-| Env: `DB_PATH` | `/app/data/fermentation.db` |
-| Env: `NODE_ENV` | `production` |
+Your app will be available at:
+- `https://<your-project>.web.app`
+- `https://<your-project>.firebaseapp.com`
 
 ## API Endpoints
 
@@ -118,7 +127,7 @@ docker compose up -d --build
 Durations are calculated from temperature using linear formulas in `server/data/rules.js`. Each type has its own temperature ranges and return values (all in hours):
 
 | Type | Range | Formula |
-|------|-------|---------|
+|------|-------|----------|
 | Milk Kefir | 8–30°C | `-2T + 64` / `-T + 44` |
 | Buttermilk | <27°C | `-1.2T + 60` / `-1.2T + 54` |
 | Water Kefir | <28°C | `48h` / `-1.2T + 72` / `-2T + 80` |

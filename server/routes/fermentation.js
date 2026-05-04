@@ -1,12 +1,12 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { generatePlan } = require('../data/rules');
-const { insertFermentation, getFermentation, updateFermentation } = require('../db');
+const { insertFermentation, getFermentation, updateFermentation } = require('../firebase-db');
 
 const router = express.Router();
 
 // Create new fermentation session
-router.post('/', express.json(), (req, res) => {
+router.post('/', express.json(), async (req, res) => {
   const { type, temperature } = req.body;
 
   if (!type || !temperature) {
@@ -24,7 +24,7 @@ router.post('/', express.json(), (req, res) => {
   }
 
   const id = uuidv4();
-  insertFermentation(id, type, temp, plan.startTime, plan);
+  await insertFermentation(id, type, temp, plan.startTime, plan);
 
   const baseUrl = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`;
   res.json({
@@ -35,8 +35,8 @@ router.post('/', express.json(), (req, res) => {
 });
 
 // Get fermentation details
-router.get('/:id', (req, res) => {
-  const fermentation = getFermentation(req.params.id);
+router.get('/:id', async (req, res) => {
+  const fermentation = await getFermentation(req.params.id);
   if (!fermentation) {
     return res.status(404).json({ error: 'Fermentation not found' });
   }
@@ -48,8 +48,8 @@ router.get('/:id', (req, res) => {
 });
 
 // Update fermentation (e.g., change temperature or restart)
-router.put('/:id', express.json(), (req, res) => {
-  const fermentation = getFermentation(req.params.id);
+router.put('/:id', express.json(), async (req, res) => {
+  const fermentation = await getFermentation(req.params.id);
   if (!fermentation) {
     return res.status(404).json({ error: 'Fermentation not found' });
   }
@@ -61,7 +61,7 @@ router.put('/:id', express.json(), (req, res) => {
 
   const temp = parseFloat(temperature);
   const plan = generatePlan(fermentation.type, temp, new Date(fermentation.startTime));
-  updateFermentation(req.params.id, plan);
+  await updateFermentation(req.params.id, plan);
 
   const baseUrl = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`;
   res.json({

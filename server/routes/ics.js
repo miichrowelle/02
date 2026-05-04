@@ -1,12 +1,12 @@
 const express = require('express');
 const icalPkg = require('ical-generator');
 const ICalCalendar = icalPkg.default || icalPkg;
-const { getFermentation } = require('../db');
+const { getFermentation } = require('../firebase-db');
 
 const router = express.Router();
 
-router.get('/:id/ics', (req, res) => {
-  const fermentation = getFermentation(req.params.id);
+router.get('/:id/ics', async (req, res) => {
+  const fermentation = await getFermentation(req.params.id);
 
   if (!fermentation) {
     return res.status(404).send('Fermentation not found');
@@ -21,7 +21,7 @@ router.get('/:id/ics', (req, res) => {
 
   events.forEach((event) => {
     const startDate = new Date(event.dueDate);
-    const endDate = new Date(startDate.getTime() + 30 * 60 * 1000); // 30 min duration
+    const endDate = new Date(startDate.getTime() + 30 * 60 * 60 * 1000); // 30 min duration
 
     cal.createEvent({
       start: startDate,
@@ -35,7 +35,7 @@ router.get('/:id/ics', (req, res) => {
   // Add fermentation start event
   cal.createEvent({
     start: new Date(fermentation.startTime),
-    end: new Date(new Date(fermentation.startTime).getTime() + 30 * 60 * 1000),
+    end: new Date(new Date(fermentation.startTime).getTime() + 30 * 60 * 60 * 1000),
     summary: `[${fermentation.plan.type}] Fermentation Started`,
     description: `Started ${fermentation.plan.type} at ${fermentation.temperature}°C`,
   });
